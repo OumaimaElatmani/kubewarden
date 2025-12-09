@@ -1,0 +1,43 @@
+{
+  "apiVersion": "admission.k8s.io/v1",
+  "kind": "AdmissionReview",
+  "request": {
+    "uid": "12345",
+    "kind": {
+      "group": "",
+      "version": "v1",
+      "kind": "Service"
+    },
+    "resource": {
+      "group": "",
+      "version": "v1",
+      "resource": "services"
+    },
+    "name": "my-nodeport-service",
+    "namespace": "default",
+    "operation": "CREATE",
+    "userInfo": {
+      "username": "kwctl-test-user",
+      "groups": [
+        "system:authenticated"
+      ]
+    },
+    "object": {
+      "apiVersion": "v1",
+      "kind": "Service",
+      "metadata": {
+        "name": "my-nodeport-service",
+        "namespace": "default"
+      },
+      "spec": {
+        "type": "NodePort",
+        "ports": [
+          {
+            "port": 80,
+            "targetPort": 80
+          }
+        ]
+      }
+    }
+  }
+}
