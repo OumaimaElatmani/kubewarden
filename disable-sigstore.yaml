@@ -1,0 +1,7 @@
+# disable-sigstore.yaml
+policyServer:
+  annotations: {}
+  env:
+    - name: KUBEWARDEN_SIGSTORE_DISABLE
+      value: "true"
+

@@ -28,23 +28,143 @@ pub extern "C" fn wapc_init() {
     register_function("protocol_version", protocol_version_guest);
 }
 
+fn is_dockerhub_image(image: &str) -> bool {
+    // Simple heuristics: refine to match your needs
+    // Examples considered Docker Hub:
+    //   "nginx", "library/nginx", "docker.io/nginx", "docker.io/library/nginx"
+    !image.contains('.') && !image.contains('/') // "nginx"
+        || image.starts_with("docker.io/")       // "docker.io/nginx"
+        || image.starts_with("library/")         // "library/nginx"
+}
+
+fn is_bitnami_image(image: &str) -> bool {
+    // Matches bitnami from Docker Hub or other registries
+    image.contains("/bitnami/") || image.starts_with("bitnami/")
+}
+
+fn has_resources(container: &apicore::Container) -> bool {
+    if let Some(resources) = &container.resources {
+        let has_requests = resources
+            .requests
+            .as_ref()
+            .map(|r| r.contains_key("cpu") && r.contains_key("memory"))
+            .unwrap_or(false);
+
+        let has_limits = resources
+            .limits
+            .as_ref()
+            .map(|l| l.contains_key("cpu") && l.contains_key("memory"))
+            .unwrap_or(false);
+
+        has_requests && has_limits
+    } else {
+        false
+    }
+}
+
 fn validate(payload: &[u8]) -> CallResult {
     let validation_request: ValidationRequest<Settings> = ValidationRequest::new(payload)?;
 
     info!(LOG_DRAIN, "starting validation");
     if validation_request.request.kind.kind != apicore::Pod::KIND {
-        warn!(LOG_DRAIN, "Policy validates Pods only. Accepting resource"; "kind" => &validation_request.request.kind.kind);
+        warn!(
+            LOG_DRAIN,
+            "Policy validates Pods only. Accepting resource";
+            "kind" => &validation_request.request.kind.kind
+        );
         return kubewarden::accept_request();
     }
-    // TODO: you can unmarshal any Kubernetes API type you are interested in
+
     match serde_json::from_value::<apicore::Pod>(validation_request.request.object) {
         Ok(pod) => {
-            // TODO: your logic goes here
+            let mut has_bitnami = false;
+            let mut containers_missing_resources: Vec<String> = Vec::new();
+
+            let mut all_containers: Vec<apicore::Container> = Vec::new();
+
+            if let Some(spec) = &pod.spec {
+                // main containers
+                all_containers.extend(spec.containers.clone());
+
+                // init containers
+                if let Some(init) = &spec.init_containers {
+                    all_containers.extend(init.clone());
+                }
+
+                // ephemeral containers (convert minimal fields to Container)
+                if let Some(ephem) = &spec.ephemeral_containers {
+                    for ec in ephem {
+                        all_containers.push(apicore::Container {
+                            name: ec.name.clone(),
+                            image: ec.image.clone(),
+                            // we ignore other fields (resources etc.) here
+                            ..Default::default()
+                        });
+                    }
+                }
+            }
+
+            for c in &all_containers {
+                if let Some(image) = &c.image {
+                    // Warn but do not block Docker Hub images
+                    if is_dockerhub_image(image) {
+                        warn!(
+                            LOG_DRAIN,
+                            "Using Docker Hub image";
+                            "container" => &c.name,
+                            "image" => image
+                        );
+                    }
+
+                    // Block any Bitnami image
+                    if is_bitnami_image(image) {
+                        has_bitnami = true;
+                    }
+                }
+
+                // Block containers without cpu+memory requests AND limits
+                if !has_resources(c) {
+                    containers_missing_resources.push(c.name.clone());
+                }
+            }
+
+            if has_bitnami {
+                info!(
+                    LOG_DRAIN,
+                    "rejecting pod due to Bitnami image";
+                    "pod_name" => pod.metadata.name.clone().unwrap_or_default()
+                );
+                return kubewarden::reject_request(
+                    Some("Bitnami images are not allowed by this policy".to_string()),
+                    None,
+                    None,
+                    None,
+                );
+            }
+
+            if !containers_missing_resources.is_empty() {
+                info!(
+                    LOG_DRAIN,
+                    "rejecting pod due to missing resources";
+                    "containers" => containers_missing_resources.join(", ")
+                );
+                return kubewarden::reject_request(
+                    Some(format!(
+                        "Containers must define cpu and memory requests and limits: {}",
+                        containers_missing_resources.join(", ")
+                    )),
+                    None,
+                    None,
+                    None,
+                );
+            }
+
+            // keep your original name check if you still want it
             if pod.metadata.name == Some("invalid-pod-name".to_string()) {
                 let pod_name = pod.metadata.name.unwrap();
                 info!(
                     LOG_DRAIN,
-                    "rejecting pod";
+                    "rejecting pod due to invalid name";
                     "pod_name" => &pod_name
                 );
                 kubewarden::reject_request(
@@ -59,10 +179,10 @@ fn validate(payload: &[u8]) -> CallResult {
             }
         }
         Err(_) => {
-            // TODO: handle as you wish
-            // We were forwarded a request we cannot unmarshal or
-            // understand, just accept it
-            warn!(LOG_DRAIN, "cannot unmarshal resource: this policy does not know how to evaluate this resource; accept it");
+            warn!(
+                LOG_DRAIN,
+                "cannot unmarshal resource: this policy does not know how to evaluate this resource; accept it"
+            );
             kubewarden::accept_request()
         }
     }

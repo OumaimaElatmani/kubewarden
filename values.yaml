@@ -1,0 +1,11 @@
+policyServer:
+  annotations:
+    kubewarden.io/dummy: "true"
+  env:
+    - name: KUBEWARDEN_SIGSTORE_DISABLE
+      value: "true"
+    - name: KUBEWARDEN_INSECURE_SKIP_TLS_VERIFY
+      value: "true"
+  imagePullSecrets:
+    - name: harbor-registry-cred
+

@@ -1,0 +1,17 @@
+apiVersion: policies.kubewarden.io/v1
+kind: ClusterAdmissionPolicy
+metadata:
+  name: pod-policies
+spec:
+  module: "ociregistry.groupe.intra/kubewarden/k8spolicy:v1.0"  # votre policy OCI
+  policyServer: default  # correspond au PolicyServer que vous avez nommé
+  rules:
+    - apiGroups: [""]
+      apiVersions: ["v1"]
+      resources: ["pods"]
+      operations: ["CREATE"]
+
+  settings:
+    allowedRegistry: "https://ociregistry.groupe.intra/"
+    blockedVendorPrefix: "bitnami"
+

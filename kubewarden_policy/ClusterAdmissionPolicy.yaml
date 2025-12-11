@@ -1,0 +1,16 @@
+apiVersion: policies.kubewarden.io/v1
+kind: ClusterAdmissionPolicy
+metadata:
+  name: harbor-image-policy
+spec:
+  module: "target/wasm32-wasip1/release/kubewarden_policy.wasm"
+  policyServer: default
+  rules:
+    - apiGroups: [""]
+      apiVersions: ["v1"]
+      resources: ["pods"]
+      operations: ["CREATE", "UPDATE"]
+  settings:
+    allowedRegistry: "https://ociregistry.groupe.intra/"
+    blockedVendorPrefix: "bitnami"
+
