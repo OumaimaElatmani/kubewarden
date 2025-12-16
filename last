@@ -1,0 +1,22 @@
+apiVersion: policies.kubewarden.io/v1
+kind: ClusterAdmissionPolicy
+metadata:
+  name: pod-validation-policy
+spec:
+  # Chemin vers ton module WASM compilé et publié dans un registry
+  module: "oci://ociregistry.intra/kubewarden/pod-validation-policy:latest"
+
+  # Liste des ressources que la policy peut lire (vide ici car ton code ne lit rien d'autre)
+  contextAwareResources: []
+
+  # Règles d'application
+  rules:
+    - apiGroups: [""]             # API Core
+      apiVersions: ["v1"]         # version
+      kinds: ["Pod"]              # cible : Pods
+      operations: ["CREATE", "UPDATE"]
+
+  mutating: false                # Policy non mutante
+  failurePolicy: Fail            # Bloque les requêtes si la policy échoue
+  mode: Protect                  # Bloque les objets invalides
+  settings: {}                   # Paramètres vides, correspond au code Rust

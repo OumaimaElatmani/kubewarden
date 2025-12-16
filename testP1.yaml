@@ -1,0 +1,14 @@
+apiVersion: policies.kubewarden.io/v1
+kind: ClusterAdmissionPolicy
+metadata:
+  name: my-custom-policy
+spec:
+  module: "ociregistry.groupe.intra/kubewarden/my-policy:v1.0.0"
+  policyServer: "default"
+  rules:
+  - apiGroups: [""]
+    apiVersions: ["v1"]
+    resources: ["pods"]
+    operations:
+    - CREATE
+  mutating: false

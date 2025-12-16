@@ -1,0 +1,11 @@
+apiVersion: policies.kubewarden.io/v1
+kind: ClusterAdmissionPolicy
+metadata:
+  name: deny-nginx-test
+spec:
+  policyServer: diot               # <-- référence ton PolicyServer
+  module: "registry://ghcr.io/kubewarden/policies/psa-privileged:v1.0.0"
+  settings:
+    deny_images:
+      - "nginx:*"
+

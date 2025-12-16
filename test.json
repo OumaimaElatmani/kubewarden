@@ -1,0 +1,16 @@
+{
+  "request": {
+    "uid": "1234",
+    "kind": { "group": "", "version": "v1", "kind": "Pod" },
+    "namespace": "default",
+    "name": "nginx-pod",
+    "object": {
+      "metadata": { "name": "nginx-pod" },
+      "spec": {
+        "containers": [
+          { "name": "nginx", "image": "nginx:latest" }
+        ]
+      }
+    }
+  }
+}

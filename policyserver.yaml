@@ -1,0 +1,12 @@
+apiVersion: policies.kubewarden.io/v1
+kind: PolicyServer
+metadata:
+  name: default
+  namespace: kubewarden
+spec:
+  env:
+    - name: KUBEWARDEN_LOG_LEVEL
+      value: info
+  replicas: 1
+  serviceAccountName: policy-server
+  image: ghcr.io/kubewarden/policy-server:v1.22.0
